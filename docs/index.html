@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一周资讯速递知识图谱</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; text-align: center; }
+    header h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+    header p { font-size: 14px; opacity: 0.9; }
+    .stats { display: flex; justify-content: center; gap: 32px; margin-top: 16px; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-label { font-size: 12px; opacity: 0.8; }
+    .controls { background: white; padding: 16px; border-bottom: 1px solid #eee; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .filter-group { display: flex; gap: 8px; align-items: center; }
+    .filter-label { font-size: 13px; color: #666; }
+    .filter-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+    .filter-btn:hover { border-color: #667eea; }
+    .filter-btn.active { background: #667eea; color: white; border-color: #667eea; }
+    #graph { width: 100%; height: calc(100vh - 200px); min-height: 500px; }
+    .tooltip { position: absolute; background: white; border-radius: 8px; padding: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); pointer-events: none; max-width: 300px; z-index: 1000; opacity: 0; transition: opacity 0.2s; }
+    .tooltip.visible { opacity: 1; }
+    .tooltip-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #333; }
+    .tooltip-meta { font-size: 12px; color: #666; }
+    .tooltip-meta span { display: block; margin-top: 4px; }
+    .legend { position: absolute; bottom: 20px; right: 20px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .legend-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #333; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #666; margin-bottom: 4px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .node { cursor: pointer; }
+    .node circle { stroke: white; stroke-width: 2px; transition: all 0.3s; }
+    .node:hover circle { stroke-width: 4px; transform: scale(1.1); }
+    .node text { font-size: 10px; fill: #333; pointer-events: none; }
+    .link { stroke: #ddd; stroke-opacity: 0.6; }
+    footer { text-align: center; padding: 16px; color: #999; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>一周资讯速递知识图谱</h1>
+    <p>基于已上传的每周资讯报告自动生成</p>
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="total-docs">--</div><div class="stat-label">文档总数</div></div>
+      <div class="stat"><div class="stat-value" id="total-years">--</div><div class="stat-label">覆盖年份</div></div>
+    </div>
+  </header>
+  
+  <div class="controls">
+    <div class="filter-group">
+      <span class="filter-label">年份:</span>
+      <button class="filter-btn active" data-filter="all">全部</button>
+      <button class="filter-btn" data-filter="2024">2024</button>
+      <button class="filter-btn" data-filter="2025">2025</button>
+      <button class="filter-btn" data-filter="2026">2026</button>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">类型:</span>
+      <button class="filter-btn active" data-type="all">全部</button>
+      <button class="filter-btn" data-type="资讯">资讯</button>
+      <button class="filter-btn" data-type="政策">政策</button>
+    </div>
+  </div>
+  
+  <div id="graph"></div>
+  
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-meta"></div>
+  </div>
+  
+  <div class="legend">
+    <div class="legend-title">图例</div>
+    <div class="legend-item"><div class="legend-dot" style="background: #378ADD;"></div> 资讯</div>
+    <div class="legend-item"><div class="legend-dot" style="background: #D85A30;"></div> 政策</div>
+    <div class="legend-item"><div class="legend-dot" style="background: #7F77DD;"></div> AI相关</div>
+  </div>
+  
+  <footer>
+    <p>由 GitHub Actions 自动生成 | 数据来源: weekly-news 文件夹</p>
+  </footer>
+
+  <script>
+    // 加载数据
+    fetch('graph-data.json')
+      .then(r => r.json())
+      .then(data => initGraph(data))
+      .catch(err => {
+        console.error('Failed to load graph data:', err);
+        document.getElementById('graph').innerHTML = '<p style="text-align:center;padding:50px;color:#999;">加载数据失败，请确保 GitHub Actions 已运行</p>';
+      });
+
+    let graphData = null;
+    let simulation = null;
+
+    function initGraph(data) {
+      graphData = data;
+      
+      // 更新统计
+      document.getElementById('total-docs').textContent = data.meta.totalDocuments;
+      document.getElementById('total-years').textContent = Object.keys(data.statistics.byYear).length;
+      
+      // 颜色映射
+      const colorMap = { '资讯': '#378ADD', '政策': '#D85A30', 'AI': '#7F77DD', '其他': '#888780' };
+      
+      const container = document.getElementById('graph');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      
+      const svg = d3.select('#graph')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+      
+      // 缩放
+      const g = svg.append('g');
+      const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => g.attr('transform', event.transform));
+      svg.call(zoom);
+      
+      // 复制节点和边
+      const nodes = data.nodes.map(d => ({...d}));
+      const links = data.edges.map(d => ({...d}));
+      
+      // 模拟力导向图
+      simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(80))
+        .force('charge', d3.forceManyBody().strength(-200))
+        .force('center', d3.forceCenter(width/2, height/2))
+        .force('collision', d3.forceCollide().radius(30));
+      
+      // 绘制边
+      const link = g.append('g')
+        .selectAll('line')
+        .data(links)
+        .join('line')
+        .attr('class', 'link')
+        .attr('stroke-width', d => d.strength);
+      
+      // 绘制节点组
+      const node = g.append('g')
+        .selectAll('.node')
+        .data(nodes)
+        .join('g')
+        .attr('class', 'node')
+        .call(d3.drag()
+          .on('start', dragstarted)
+          .on('drag', dragged)
+          .on('end', dragended));
+      
+      // 节点圆圈
+      node.append('circle')
+        .attr('r', 12)
+        .attr('fill', d => {
+          const cats = d.categories;
+          if (cats.includes('政策')) return colorMap['政策'];
+          if (cats.includes('资讯')) return colorMap['资讯'];
+          if (cats.includes('AI')) return colorMap['AI'];
+          return colorMap['其他'];
+        });
+      
+      // 节点标签
+      node.append('text')
+        .attr('dx', 16)
+        .attr('dy', 4)
+        .text(d => d.year);
+      
+      // 悬停提示
+      const tooltip = document.getElementById('tooltip');
+      node.on('mouseover', (event, d) => {
+        tooltip.querySelector('.tooltip-title').textContent = d.label;
+        tooltip.querySelector('.tooltip-meta').innerHTML = 
+          '<span>年份: ' + d.year + '</span>' +
+          '<span>类别: ' + d.categories.join(', ') + '</span>' +
+          '<span>格式: ' + d.docType + '</span>';
+        tooltip.classList.add('visible');
+      }).on('mousemove', (event) => {
+        tooltip.style.left = (event.pageX + 10) + 'px';
+        tooltip.style.top = (event.pageY + 10) + 'px';
+      }).on('mouseout', () => tooltip.classList.remove('visible'));
+      
+      // 更新位置
+      simulation.on('tick', () => {
+        link
+          .attr('x1', d => d.source.x)
+          .attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x)
+          .attr('y2', d => d.target.y);
+        
+        node.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+      });
+      
+      // 拖拽函数
+      function dragstarted(event) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+      }
+      function dragged(event) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+      }
+      function dragended(event) {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+      }
+      
+      // 筛选功能
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          // 更新按钮状态
+          const group = btn.parentElement;
+          group.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          
+          applyFilters();
+        });
+      });
+      
+      function applyFilters() {
+        const yearFilter = document.querySelector('[data-filter].active').dataset.filter;
+        const typeFilter = document.querySelector('[data-type].active').dataset.type;
+        
+        node.style('opacity', d => {
+          const yearMatch = yearFilter === 'all' || d.year === yearFilter;
+          const typeMatch = typeFilter === 'all' || d.categories.includes(typeFilter);
+          return yearMatch && typeMatch ? 1 : 0.1;
+        });
+        
+        link.style('opacity', l => {
+          const sourceVisible = node.style('opacity').get(l.source) > 0.1;
+          const targetVisible = node.style('opacity').get(l.target) > 0.1;
+          return sourceVisible && targetVisible ? 0.6 : 0.05;
+        });
+      }
+      
+      // 居中视图
+      svg.call(zoom.transform, d3.zoomIdentity.translate(width/4, height/4).scale(0.8));
+    }
+  </script>
+</body>
+</html>

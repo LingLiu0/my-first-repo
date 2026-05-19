@@ -1,0 +1,11 @@
+{
+  "name": "knowledge-graph-generator",
+  "version": "1.0.0",
+  "description": "Generate knowledge graph from weekly news reports",
+  "scripts": {
+    "extract": "node scripts/extract-keywords.js",
+    "generate": "node scripts/generate-graph.js"
+  },
+  "keywords": ["knowledge-graph", "github-actions"],
+  "author": "LingLiu0"
+}
