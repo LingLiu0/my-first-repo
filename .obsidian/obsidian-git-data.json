@@ -1,0 +1,12 @@
+{
+  "autoSaveInterval": 10,
+  "autoPullInterval": 10,
+  "autoPushInterval": 10,
+  "commitMessage": "vault backup: {{date}}",
+  "autoPullOnBoot": true,
+  "disablePush": false,
+  "pullBeforePush": true,
+  "disablePopups": false,
+  "listChangedFilesInMessageBody": true,
+  "showStatusBar": true
+}

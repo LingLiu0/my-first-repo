@@ -1,0 +1,9 @@
+# Obsidian workspace files (keep across syncs)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
