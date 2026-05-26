@@ -6,6 +6,13 @@
     "extract": "node scripts/extract-keywords.js",
     "generate": "node scripts/generate-graph.js"
   },
-  "keywords": ["knowledge-graph", "github-actions"],
-  "author": "LingLiu0"
+  "keywords": [
+    "knowledge-graph",
+    "github-actions"
+  ],
+  "author": "LingLiu0",
+  "dependencies": {
+    "mammoth": "^1.12.0",
+    "pdf-parse": "^2.4.5"
+  }
 }
